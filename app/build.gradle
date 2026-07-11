@@ -1,0 +1,116 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+}
+
+// Web OAuth client ID for Google Sign-In (see README — Google Cloud Console setup).
+// Looked up from local.properties first, then gradle.properties; placeholder keeps the build green.
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+def webClientId = localProps.getProperty('DRIVE_SYNC_WEB_CLIENT_ID')
+        ?: project.findProperty('DRIVE_SYNC_WEB_CLIENT_ID')
+        ?: 'REPLACE_ME.apps.googleusercontent.com'
+
+android {
+    namespace 'com.iamsubho.drivesync'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.iamsubho.drivesync"
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+
+        buildConfigField 'String', 'WEB_CLIENT_ID', "\"${webClientId}\""
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
+    packaging {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/LICENSE.md', 'META-INF/NOTICE.md']
+        }
+    }
+}
+
+dependencies {
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.lifecycle.runtime.compose
+    implementation libs.androidx.lifecycle.viewmodel.compose
+    implementation libs.androidx.activity.compose
+
+    // Compose
+    implementation platform(libs.compose.bom)
+    implementation libs.compose.ui
+    implementation libs.compose.ui.graphics
+    implementation libs.compose.ui.tooling.preview
+    implementation libs.compose.material3
+    implementation libs.compose.material.icons
+    implementation libs.navigation.compose
+    debugImplementation libs.compose.ui.tooling
+
+    // Hilt
+    implementation libs.hilt.android
+    ksp libs.hilt.compiler
+    implementation libs.hilt.navigation.compose
+    implementation libs.hilt.work
+    ksp libs.androidx.hilt.compiler
+
+    // Room + Paging
+    implementation libs.room.runtime
+    implementation libs.room.ktx
+    implementation libs.room.paging
+    ksp libs.room.compiler
+    implementation libs.paging.runtime
+    implementation libs.paging.compose
+
+    // WorkManager, DataStore, SAF, images
+    implementation libs.work.runtime
+    implementation libs.datastore.preferences
+    implementation libs.documentfile
+    implementation libs.coil.compose
+
+    // Google auth + Drive
+    implementation libs.credentials
+    implementation libs.credentials.play.services
+    implementation libs.googleid
+    implementation libs.play.services.auth
+    implementation(libs.google.api.client.android) {
+        exclude group: 'org.apache.httpcomponents'
+    }
+    implementation(libs.google.api.services.drive) {
+        exclude group: 'org.apache.httpcomponents'
+    }
+
+    // Coroutines
+    implementation libs.coroutines.android
+    implementation libs.coroutines.play.services
+
+    // Tests
+    testImplementation libs.junit
+    testImplementation libs.truth
+    testImplementation libs.coroutines.test
+}

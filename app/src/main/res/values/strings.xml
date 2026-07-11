@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Drive Sync</string>
+    <string name="sync_channel_name">Sync progress</string>
+    <string name="sync_channel_description">Shows progress of running sync jobs</string>
+</resources>
