@@ -43,6 +43,11 @@ dependencies {
 compose.desktop {
     application {
         mainClass = 'com.iamsubho.drivesync.desktop.MainKt'
+
+        // NOTE: CI uses the default packaging tasks (packageMsi / createDistributable),
+        // not the *Release* variants — those run ProGuard, which chokes on optional
+        // classes referenced by the Google API/OAuth clients. Minification isn't needed
+        // for a desktop utility.
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
             packageName = 'DriveSync'
