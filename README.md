@@ -126,10 +126,10 @@ file types, subfolder exclusions, interval scheduling (default every 24h), delet
 live progress, and per-pair logs. Closing the window minimizes to the **system tray**; sync
 runs while the app is open.
 
-**Getting it:** every push to `master` triggers the *Build Windows app* GitHub Actions
-workflow. Open the repo's **Actions** tab → latest run → **Artifacts**, and download either
-`DriveSync-windows-msi` (installer) or `DriveSync-windows-portable` (unzip and run
-`DriveSync.exe`). No local toolchain needed.
+**Getting it:** every push to `windowsv` triggers the *Build Windows app* GitHub Actions
+workflow. Open the repo's **Actions** tab → latest run → **Artifacts**, and download
+`DriveSync-windows-msi` (installer; version auto-increments per build as
+`1.0.<run number>`). No local toolchain needed.
 
 **First-run setup:** desktop Google sign-in needs its own OAuth client:
 1. Cloud Console → *Credentials → Create credentials → OAuth client ID → **Desktop app***.

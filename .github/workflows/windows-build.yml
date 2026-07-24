@@ -27,31 +27,15 @@ jobs:
       - name: Run core tests
         run: ./gradlew :core:test --no-daemon
 
-      # Default (non-Release) tasks: identical output, but skip ProGuard, which fails on
-      # optional classes referenced by the Google API/OAuth client libraries.
+      # packageMsi (not packageReleaseMsi): identical output, but skips ProGuard, which
+      # fails on optional classes referenced by the Google API/OAuth client libraries.
       # Version auto-increments with every workflow run: 1.0.<run number>.
       - name: Build MSI installer
         run: ./gradlew :desktop:packageMsi "-PdriveSyncVersion=1.0.${{ github.run_number }}" --no-daemon
-
-      - name: Build portable distribution
-        run: ./gradlew :desktop:createDistributable "-PdriveSyncVersion=1.0.${{ github.run_number }}" --no-daemon
-
-      - name: Zip portable distribution
-        shell: pwsh
-        run: |
-          $appDir = Get-ChildItem -Directory "desktop/build/compose/binaries/main/app" | Select-Object -First 1
-          Compress-Archive -Path "$($appDir.FullName)\*" -DestinationPath "DriveSync-windows-portable.zip"
 
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
           name: DriveSync-windows-msi
           path: desktop/build/compose/binaries/main/msi/*.msi
-          if-no-files-found: error
-
-      - name: Upload portable ZIP artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: DriveSync-windows-portable
-          path: DriveSync-windows-portable.zip
           if-no-files-found: error
