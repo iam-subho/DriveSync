@@ -46,6 +46,7 @@ class DesktopAuth(baseDir: File) {
         val receiver = LocalServerReceiver.Builder().setPort(-1).build()
         activeReceiver = receiver
         try {
+            DesktopLog.log("auth: flow built, starting loopback receiver + authorize")
             val app = object : AuthorizationCodeInstalledApp(flow(clientId, clientSecret), receiver) {
                 override fun onAuthorization(authorizationUrl: AuthorizationCodeRequestUrl) {
                     val url = authorizationUrl.build()

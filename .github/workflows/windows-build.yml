@@ -29,11 +29,12 @@ jobs:
 
       # Default (non-Release) tasks: identical output, but skip ProGuard, which fails on
       # optional classes referenced by the Google API/OAuth client libraries.
+      # Version auto-increments with every workflow run: 1.0.<run number>.
       - name: Build MSI installer
-        run: ./gradlew :desktop:packageMsi --no-daemon
+        run: ./gradlew :desktop:packageMsi "-PdriveSyncVersion=1.0.${{ github.run_number }}" --no-daemon
 
       - name: Build portable distribution
-        run: ./gradlew :desktop:createDistributable --no-daemon
+        run: ./gradlew :desktop:createDistributable "-PdriveSyncVersion=1.0.${{ github.run_number }}" --no-daemon
 
       - name: Zip portable distribution
         shell: pwsh

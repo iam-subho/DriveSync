@@ -83,8 +83,8 @@ class AppState {
     fun signIn() {
         val oauth = config.value.oauth
         if (!oauth.isConfigured || _busy.value) return
+        _busy.value = true // set before launching so rapid clicks can't start parallel flows
         signInJob = scope.launch(Dispatchers.IO) {
-            _busy.value = true
             _authUrl.value = null
             try {
                 com.iamsubho.drivesync.desktop.DesktopLog.log("signIn: starting OAuth flow")
@@ -97,7 +97,11 @@ class AppState {
                 configStore.update { it.copy(account = DesktopAccount(email = email)) }
                 showNotice("Connected $email")
                 com.iamsubho.drivesync.desktop.DesktopLog.log("signIn: connected $email")
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Throwable, not Exception: packaging problems surface as Errors
+                // (NoClassDefFoundError etc.) and must be visible, not swallowed.
                 com.iamsubho.drivesync.desktop.DesktopLog.log("signIn: failed", e)
                 showNotice("Sign-in failed: ${e.message ?: e.javaClass.simpleName}")
             } finally {

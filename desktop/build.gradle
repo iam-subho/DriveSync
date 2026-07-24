@@ -49,9 +49,16 @@ compose.desktop {
         // classes referenced by the Google API/OAuth clients. Minification isn't needed
         // for a desktop utility.
         nativeDistributions {
+            // jpackage's default jlink image strips modules the Google OAuth/Drive stack
+            // needs at runtime (java.naming for the Jetty loopback receiver, jdk.crypto.*
+            // for TLS to Google). Missing ones surface as silent NoClassDefFoundErrors in
+            // the packaged app only — bundle the full JRE and be done with it.
+            includeAllModules = true
             targetFormats(TargetFormat.Msi)
             packageName = 'DriveSync'
-            packageVersion = '1.0.0'
+            // CI passes -PdriveSyncVersion=1.0.<run number> so every build auto-increments
+            // (MSI upgrades require a growing version). Local builds default to 1.0.0.
+            packageVersion = (project.findProperty('driveSyncVersion') ?: '1.0.0')
             vendor = 'Subhojit Kundu (iam-subho)'
             description = 'Sync local folders with Google Drive'
             windows {
