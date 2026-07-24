@@ -48,9 +48,15 @@ class AppState {
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
 
+    /** Google consent URL of an in-flight sign-in — shown in the UI as a manual fallback. */
+    private val _authUrl = MutableStateFlow<String?>(null)
+    val authUrl: StateFlow<String?> = _authUrl
+
+    private var signInJob: Job? = null
     private val runningJobs = mutableMapOf<String, Job>()
 
     init {
+        com.iamsubho.drivesync.desktop.DesktopLog.init(configStore.baseDir)
         // Restore a previous session silently.
         val oauth = config.value.oauth
         if (oauth.isConfigured) {
@@ -77,21 +83,37 @@ class AppState {
     fun signIn() {
         val oauth = config.value.oauth
         if (!oauth.isConfigured || _busy.value) return
-        scope.launch(Dispatchers.IO) {
+        signInJob = scope.launch(Dispatchers.IO) {
             _busy.value = true
+            _authUrl.value = null
             try {
-                val credential = auth.signIn(oauth.clientId, oauth.clientSecret)
+                com.iamsubho.drivesync.desktop.DesktopLog.log("signIn: starting OAuth flow")
+                val credential = auth.signIn(oauth.clientId, oauth.clientSecret) { url ->
+                    _authUrl.value = url
+                }
                 val provider = DesktopDriveProvider(credential)
                 val email = provider.accountEmail()
                 _provider.value = provider
                 configStore.update { it.copy(account = DesktopAccount(email = email)) }
                 showNotice("Connected $email")
+                com.iamsubho.drivesync.desktop.DesktopLog.log("signIn: connected $email")
             } catch (e: Exception) {
+                com.iamsubho.drivesync.desktop.DesktopLog.log("signIn: failed", e)
                 showNotice("Sign-in failed: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 _busy.value = false
+                _authUrl.value = null
             }
         }
+    }
+
+    /** Aborts a pending sign-in (stops the loopback listener so the coroutine unblocks). */
+    fun cancelSignIn() {
+        auth.cancel()
+        signInJob?.cancel()
+        signInJob = null
+        _busy.value = false
+        _authUrl.value = null
     }
 
     fun signOut() {

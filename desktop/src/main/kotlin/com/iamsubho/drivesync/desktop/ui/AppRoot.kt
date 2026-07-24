@@ -84,6 +84,7 @@ fun AppRoot(appState: AppState) {
 fun OnboardingScreen(appState: AppState) {
     val config by appState.config.collectAsState()
     val busy by appState.busy.collectAsState()
+    val authUrl by appState.authUrl.collectAsState()
     var clientId by remember { mutableStateOf(config.oauth.clientId) }
     var clientSecret by remember { mutableStateOf(config.oauth.clientSecret) }
 
@@ -153,13 +154,58 @@ fun OnboardingScreen(appState: AppState) {
                     colors = ButtonDefaults.buttonColors(containerColor = DsColors.Primary),
                     shape = RoundedCornerShape(22.dp),
                 ) {
-                    Text(if (busy) "Waiting for browser…" else "Sign in with Google", color = Color.White)
+                    Text(if (busy) "Waiting for Google…" else "Sign in with Google", color = Color.White)
                 }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "Your browser opens for Google's consent screen.",
-                    fontSize = 12.sp, color = DsColors.TextTertiary,
-                )
+                if (busy) {
+                    Spacer(Modifier.width(12.dp))
+                    TextButton(onClick = { appState.cancelSignIn() }) {
+                        Text("Cancel", color = DsColors.Error)
+                    }
+                } else {
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Your browser opens for Google's consent screen.",
+                        fontSize = 12.sp, color = DsColors.TextTertiary,
+                    )
+                }
+            }
+
+            // Manual fallback: the consent URL is always available here, so a failed
+            // browser launch can never strand the user.
+            authUrl?.let { url ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DsColors.Card)
+                        .padding(14.dp),
+                ) {
+                    Text(
+                        "Browser didn't open? Use this link:",
+                        fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DsColors.TextPrimary,
+                    )
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(
+                            url,
+                            fontSize = 11.sp, color = DsColors.TextSecondary,
+                            maxLines = 3,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                        TextButton(onClick = {
+                            com.iamsubho.drivesync.desktop.auth.DesktopAuth.openBrowser(url)
+                        }) { Text("Open in browser", color = DsColors.Primary) }
+                        TextButton(onClick = {
+                            val selection = java.awt.datatransfer.StringSelection(url)
+                            java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                .setContents(selection, selection)
+                            appState.showNotice("Link copied")
+                        }) { Text("Copy link", color = DsColors.Primary) }
+                    }
+                }
             }
         }
     }
