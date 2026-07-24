@@ -30,6 +30,9 @@ dependencies {
     implementation libs.coroutines.swing
     implementation libs.kotlinx.serialization.json
 
+    testImplementation libs.junit
+    testImplementation libs.truth
+
     // Google Drive v3 + installed-app OAuth (browser + loopback redirect)
     implementation(libs.google.api.client) {
         exclude group: 'org.apache.httpcomponents'

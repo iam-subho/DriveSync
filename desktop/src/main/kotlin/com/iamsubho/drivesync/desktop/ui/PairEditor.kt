@@ -103,7 +103,13 @@ fun PairEditorDialog(
     }
     LaunchedEffect(localPath) {
         subfolders = if (localPath.isNotBlank()) {
-            withContext(Dispatchers.IO) { LocalFsScanner.listSubfolders(File(localPath)) }
+            withContext(Dispatchers.IO) {
+                val found = LocalFsScanner.listSubfolders(File(localPath))
+                com.iamsubho.drivesync.desktop.DesktopLog.log(
+                    "pairEditor: '$localPath' has ${found.size} subfolders: ${found.take(10)}",
+                )
+                found
+            }
         } else {
             emptyList()
         }
@@ -154,6 +160,35 @@ fun PairEditorDialog(
                 SectionLabel("Drive folder (My Drive)")
                 if (loadingFolders) {
                     Text("Loading folders…", fontSize = 12.5.sp, color = DsColors.TextTertiary)
+                }
+                var newFolderName by remember { mutableStateOf("") }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
+                    OutlinedTextField(
+                        value = newFolderName,
+                        onValueChange = { newFolderName = it },
+                        label = { Text("New folder name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    DsButton("Create in Drive") {
+                        val name = newFolderName.trim()
+                        val p = provider
+                        if (name.isNotBlank() && p != null) {
+                            scope.launch {
+                                try {
+                                    val created = withContext(Dispatchers.IO) { p.createFolder(null, name) }
+                                    driveFolders = driveFolders + created
+                                    driveFolderId = created.id
+                                    driveFolderName = created.name
+                                    newFolderName = ""
+                                } catch (e: Exception) {
+                                    com.iamsubho.drivesync.desktop.DesktopLog.log("pairEditor: createFolder failed", e)
+                                    appState.showNotice("Could not create folder: ${e.message}")
+                                }
+                            }
+                        }
+                    }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     driveFolders.forEach { folder ->
@@ -251,9 +286,16 @@ fun PairEditorDialog(
                     }
                 }
 
-                // Exclusions
-                if (subfolders.isNotEmpty()) {
+                // Exclusions — section always visible once a folder is picked, so an empty
+                // list is visible information instead of silence.
+                if (localPath.isNotBlank()) {
                     SectionLabel("Exclude subfolders")
+                    if (subfolders.isEmpty()) {
+                        Text(
+                            "No subfolders found in this folder.",
+                            fontSize = 12.5.sp, color = DsColors.TextTertiary,
+                        )
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         subfolders.forEach { sub ->
                             val checked = sub in excluded

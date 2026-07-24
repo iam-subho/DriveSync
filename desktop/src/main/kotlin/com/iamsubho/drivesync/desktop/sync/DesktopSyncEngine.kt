@@ -39,9 +39,17 @@ class DesktopSyncEngine(
         }
 
         try {
+            com.iamsubho.drivesync.desktop.DesktopLog.log(
+                "sync[${pair.name}]: start local='${pair.localPath}' driveFolder=${pair.driveFolderId} " +
+                    "excluded=${pair.excludedFolders}",
+            )
             val remotes = provider.listAllFiles(pair.driveFolderId)
                 .filterNot { ExclusionFilter.isExcluded(it.relativePath, pair.excludedFolders) }
             val locals = LocalFsScanner.scan(root, pair.excludedFolders)
+            com.iamsubho.drivesync.desktop.DesktopLog.log(
+                "sync[${pair.name}]: ${remotes.size} remote, ${locals.size} local files; " +
+                    "local samples=${locals.take(3).map { it.relativePath }}",
+            )
 
             val direction = SyncDirection.valueOf(pair.direction)
             val filter = FileFilter(
@@ -110,6 +118,10 @@ class DesktopSyncEngine(
                         is PlanEntry.Upload -> {
                             val parentDir = entry.local.relativePath.substringBeforeLast('/', "")
                             val parentId = resolveFolderId(provider, parentDir, folderIdCache)
+                            com.iamsubho.drivesync.desktop.DesktopLog.log(
+                                "sync[${pair.name}]: upload '${entry.local.relativePath}' " +
+                                    "parentDir='$parentDir' parentId=$parentId",
+                            )
                             provider.upload(
                                 parentFolderId = parentId,
                                 file = entry.local,
@@ -187,7 +199,15 @@ class DesktopSyncEngine(
         val name = relativeDir.substringAfterLast('/')
         val parentId = resolveFolderId(provider, parentDir, cache)
         val existing = provider.listFolders(parentId).firstOrNull { it.name == name }
-        val id = existing?.id ?: provider.createFolder(parentId, name).id
+        val id = if (existing != null) {
+            existing.id
+        } else {
+            val created = provider.createFolder(parentId, name)
+            com.iamsubho.drivesync.desktop.DesktopLog.log(
+                "sync: created Drive folder '$name' (id=${created.id}) under $parentId",
+            )
+            created.id
+        }
         cache[relativeDir] = id
         return id
     }
