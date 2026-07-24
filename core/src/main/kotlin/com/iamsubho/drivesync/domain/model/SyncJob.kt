@@ -11,6 +11,8 @@ data class SyncJob(
     val direction: SyncDirection,
     val fileTypes: Set<FileTypeCategory>,
     val customExtensions: List<String>,
+    /** Subfolders (relative to the local root) excluded from sync on both sides. */
+    val excludedFolders: List<String> = emptyList(),
     val uploadLimitMb: Int?,
     val uploadLimitMode: LimitMode,
     val downloadLimitMb: Int?,

@@ -123,6 +123,8 @@ fun StepReview(state: WizardUiState, viewModel: WizardViewModel) {
             "Local folder" to (state.localFolderPath ?: "—"),
             "Direction" to state.direction.label,
             "File types" to typeNames,
+            "Excluded" to if (state.excludedFolders.isEmpty()) "None"
+            else state.excludedFolders.sorted().joinToString(", "),
             "Upload limit" to state.upLimit.summaryLabel(),
             "Download limit" to state.downLimit.summaryLabel(),
             "Schedule" to "Every ${state.effectiveIntervalHours} hours",

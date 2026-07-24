@@ -1,11 +1,15 @@
 # Drive Sync
 
-A native Android app that synchronizes files between local folders and Google Drive.
-Supports **multiple Google accounts** and **multiple independent sync jobs**, each pairing one
-local folder (chosen via Storage Access Framework) with one Drive folder.
+File synchronization with Google Drive for **Android** and **Windows**.
+The Android app supports multiple Google accounts and multiple independent sync jobs, each
+pairing one local folder (chosen via Storage Access Framework) with one Drive folder. The
+Windows app is a lean desktop client sharing the same sync engine.
 
 Built with Kotlin, Jetpack Compose (Material 3), MVVM + Clean Architecture, Hilt, Room,
-WorkManager, and the Google Drive API v3.
+WorkManager, Compose for Desktop, and the Google Drive API v3.
+
+**Modules:** `:core` (pure Kotlin sync engine — planner, filters, backoff; fully unit-tested) ·
+`:app` (Android) · `:desktop` (Windows, built by GitHub Actions).
 
 ---
 
@@ -18,7 +22,8 @@ WorkManager, and the Google Drive API v3.
 - **Sync jobs** — created through a 9-step wizard:
   1. Choose Drive account
   2. Choose (or create) a Drive folder
-  3. Choose a local folder (SAF; permission persisted for background sync)
+  3. Choose a local folder (SAF; permission persisted for background sync) — with checkboxes
+     to **exclude subfolders** (excluded content never uploads, and never downloads back)
   4. Battery optimization exemption (required for reliable background sync)
   5. File-type filters — All / Images / Videos / Documents / Audio / Archives / custom extensions
   6. Size limits per direction — *No limit* or *Custom MB*, with a mode:
@@ -113,13 +118,38 @@ The app talks to the real Drive API, so you need OAuth credentials:
 > not registered, and for accounts missing from the consent screen's test-user list. Console
 > changes can take a few minutes to propagate.
 
+## Windows desktop app
+
+A lean DriveSync client for Windows lives in `:desktop` (Compose for Desktop). It shares the
+`:core` sync engine with the Android app: sync pairs (local folder ↔ Drive folder), direction,
+file types, subfolder exclusions, interval scheduling (default every 24h), delete-after-upload,
+live progress, and per-pair logs. Closing the window minimizes to the **system tray**; sync
+runs while the app is open.
+
+**Getting it:** every push to `master` triggers the *Build Windows app* GitHub Actions
+workflow. Open the repo's **Actions** tab → latest run → **Artifacts**, and download either
+`DriveSync-windows-msi` (installer) or `DriveSync-windows-portable` (unzip and run
+`DriveSync.exe`). No local toolchain needed.
+
+**First-run setup:** desktop Google sign-in needs its own OAuth client:
+1. Cloud Console → *Credentials → Create credentials → OAuth client ID → **Desktop app***.
+2. Launch DriveSync, paste that client's **ID and secret** (stored only on your PC in
+   `%APPDATA%\DriveSync\config.json`), and click *Sign in with Google* — your browser opens
+   Google's consent screen.
+3. Add sync pairs and go. Tokens refresh silently; sign out any time in Settings.
+
+Desktop v1 limits: one Google account; syncs while the app runs (not a Windows service);
+no See Files browser.
+
 ## Build & run
 
-Requirements: Android Studio (Ladybug or newer), JDK 11+, Android SDK 36.
+Requirements: Android Studio (Ladybug or newer), JDK 17+, Android SDK 36.
 
 ```
-gradlew :app:assembleDebug        # build APK
-gradlew :app:testDebugUnitTest    # run unit tests
+gradlew :app:assembleDebug        # Android APK
+gradlew :core:test :app:testDebugUnitTest   # all unit tests
+gradlew :desktop:run              # run the Windows app from source
+gradlew :desktop:packageReleaseMsi          # Windows installer (needs JDK 17 + WiX; CI does this)
 ```
 
 Or open the project in Android Studio and press Run. Minimum Android version: 7.0 (API 24).
@@ -178,10 +208,11 @@ any files you changed.
 
 ## Tests
 
-Pure-logic unit tests live in `app/src/test/` (49 tests):
+Pure-logic unit tests (54 total) live in `core/src/test/` and `app/src/test/`:
 
 - `SyncPlannerTest` — direction matrix, Newest Wins conflicts, hash-identical skips,
   modified-time tolerance, size-limit interactions, delete-after-upload safeguards
 - `FileFilterTest` — type/extension filtering and both size-limit modes (skip-above / only-above)
+- `ExclusionFilterTest` — subfolder exclusion matching (files and subtrees)
 - `FileSearchFilterTest` — See Files name + date-range search
 - `BackoffPolicyTest`, `SpeedTrackerTest`, `FormattersTest`, `ExtensionDefaultsTest`

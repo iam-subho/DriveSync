@@ -33,6 +33,7 @@ data class SyncJobEntity(
     val direction: String,
     val fileTypes: String,          // comma-joined FileTypeCategory names
     val customExtensions: String,   // comma-joined lowercase extensions
+    val excludedFolders: String = "", // newline-joined relative folder paths
     val uploadLimitMb: Int?,
     val uploadLimitMode: String,
     val downloadLimitMb: Int?,
@@ -60,6 +61,7 @@ data class SyncJobEntity(
         fileTypes = fileTypes.split(',').filter { it.isNotBlank() }
             .map { FileTypeCategory.valueOf(it) }.toSet(),
         customExtensions = customExtensions.split(',').filter { it.isNotBlank() },
+        excludedFolders = excludedFolders.split('\n').filter { it.isNotBlank() },
         uploadLimitMb = uploadLimitMb,
         uploadLimitMode = LimitMode.valueOf(uploadLimitMode),
         downloadLimitMb = downloadLimitMb,
@@ -88,6 +90,7 @@ fun SyncJob.toEntity() = SyncJobEntity(
     direction = direction.name,
     fileTypes = fileTypes.joinToString(",") { it.name },
     customExtensions = customExtensions.joinToString(","),
+    excludedFolders = excludedFolders.joinToString("\n"),
     uploadLimitMb = uploadLimitMb,
     uploadLimitMode = uploadLimitMode.name,
     downloadLimitMb = downloadLimitMb,

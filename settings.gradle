@@ -21,3 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Drive Sync"
 include ':app'
+include ':core'
+include ':desktop'

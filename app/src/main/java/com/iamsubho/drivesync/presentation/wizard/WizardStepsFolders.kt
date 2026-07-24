@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -275,4 +277,57 @@ fun Step3LocalFolder(state: WizardUiState, viewModel: WizardViewModel) {
         onClick = { pickerLauncher.launch(null) },
         height = 42.dp,
     )
+
+    // Exclusion picker — tick subfolders that should NOT sync.
+    if (state.localFolderUri != null && state.localSubfolders.isNotEmpty()) {
+        Text(
+            text = "Exclude subfolders",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = DsColors.TextPrimary,
+            modifier = Modifier.padding(top = 18.dp),
+        )
+        Text(
+            text = "Ticked folders are skipped completely — nothing inside them uploads or downloads.",
+            fontSize = 12.sp,
+            color = DsColors.TextTertiary,
+            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+        )
+        state.localSubfolders.forEach { name ->
+            val checked = name in state.excludedFolders
+            com.iamsubho.drivesync.presentation.common.DsCard(
+                cornerRadius = 12.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                onClick = { viewModel.toggleExcludedFolder(name) },
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = if (checked) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
+                        contentDescription = null,
+                        tint = if (checked) DsColors.Primary else DsColors.DisabledFg,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Icon(
+                        Icons.Outlined.Folder, contentDescription = null,
+                        tint = DsColors.TextTertiary,
+                        modifier = Modifier
+                            .padding(start = 10.dp)
+                            .size(18.dp),
+                    )
+                    Text(
+                        text = name,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (checked) DsColors.TextTertiary else DsColors.TextPrimary,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+        }
+    }
 }

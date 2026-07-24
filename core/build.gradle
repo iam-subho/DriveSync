@@ -1,0 +1,22 @@
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+}
+
+// Pure-JVM sync brain shared by :app (Android) and :desktop (Windows).
+// No Android or framework dependencies allowed in this module.
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+    }
+}
+
+dependencies {
+    testImplementation libs.junit
+    testImplementation libs.truth
+}

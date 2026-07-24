@@ -33,6 +33,9 @@ data class WizardUiState(
     val localFolderUri: String? = null,
     val localFolderName: String? = null,
     val localFolderPath: String? = null,
+    /** Immediate subfolders of the picked local folder (exclusion candidates). */
+    val localSubfolders: List<String> = emptyList(),
+    val excludedFolders: Set<String> = emptySet(),
     val batteryOk: Boolean = false,
     val types: Set<FileTypeCategory> = setOf(FileTypeCategory.IMAGES, FileTypeCategory.VIDEOS),
     val customExtensions: String = "",

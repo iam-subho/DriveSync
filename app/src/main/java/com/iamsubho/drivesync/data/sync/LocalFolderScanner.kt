@@ -31,18 +31,28 @@ class LocalFolderScanner @Inject constructor(
         return root.exists() && root.canRead()
     }
 
-    fun scan(treeUri: Uri): List<LocalFile> {
+    fun scan(treeUri: Uri, excludedFolders: Collection<String> = emptyList()): List<LocalFile> {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
         val results = mutableListOf<LocalFile>()
-        walk(root, "", results)
+        walk(root, "", excludedFolders, results)
         return results
     }
 
-    private fun walk(dir: DocumentFile, prefix: String, out: MutableList<LocalFile>) {
+    private fun walk(
+        dir: DocumentFile,
+        prefix: String,
+        excludedFolders: Collection<String>,
+        out: MutableList<LocalFile>,
+    ) {
         for (child in dir.listFiles()) {
             val name = child.name ?: continue
             when {
-                child.isDirectory -> walk(child, "$prefix$name/", out)
+                child.isDirectory -> {
+                    // Skip whole excluded subtrees — cheaper than filtering afterwards.
+                    if (!ExclusionFilter.isExcludedDir("$prefix$name", excludedFolders)) {
+                        walk(child, "$prefix$name/", excludedFolders, out)
+                    }
+                }
                 child.isFile && !name.endsWith(TMP_SUFFIX) -> out += LocalFile(
                     name = name,
                     relativePath = "$prefix$name",
@@ -52,6 +62,15 @@ class LocalFolderScanner @Inject constructor(
                 )
             }
         }
+    }
+
+    /** Names of the immediate subfolders of [treeUri] (for the wizard's exclusion picker). */
+    fun listSubfolders(treeUri: Uri): List<String> {
+        val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
+        return root.listFiles()
+            .filter { it.isDirectory }
+            .mapNotNull { it.name }
+            .sorted()
     }
 
     fun openIn(uri: String): InputStream =

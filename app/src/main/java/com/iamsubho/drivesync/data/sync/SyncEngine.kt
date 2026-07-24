@@ -100,9 +100,12 @@ class SyncEngine @Inject constructor(
 
     private suspend fun planAndEnqueue(jobId: Long, treeUri: Uri) {
         val job = jobDao.get(jobId)!!.toDomain()
+        // Exclusions apply to BOTH sides: excluded local files never upload, and Drive files
+        // under an excluded path never download back.
         val remotes = provider.listAllFiles(job.accountEmail, job.driveFolderId)
-        android.util.Log.i(TAG, "plan: ${remotes.size} remote files listed")
-        val locals = scanner.scan(treeUri)
+            .filterNot { ExclusionFilter.isExcluded(it.relativePath, job.excludedFolders) }
+        android.util.Log.i(TAG, "plan: ${remotes.size} remote files listed (after exclusions)")
+        val locals = scanner.scan(treeUri, job.excludedFolders)
         android.util.Log.i(TAG, "plan: ${locals.size} local files scanned")
         val filter = FileFilter(
             fileTypes = job.fileTypes,

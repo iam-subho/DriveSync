@@ -32,6 +32,7 @@ class WizardViewModel @Inject constructor(
     accountRepository: AccountRepository,
     private val jobRepository: SyncJobRepository,
     private val cloudProvider: CloudStorageProvider,
+    private val scanner: com.iamsubho.drivesync.data.sync.LocalFolderScanner,
     private val snackBus: SnackBus,
 ) : ViewModel() {
 
@@ -144,7 +145,22 @@ class WizardViewModel @Inject constructor(
                 localFolderName = doc?.name ?: "Selected folder",
                 localFolderPath = com.iamsubho.drivesync.presentation.common.Formatters
                     .decodeTreePath(uri.toString()),
+                localSubfolders = emptyList(),
+                excludedFolders = emptySet(),
             )
+        }
+        // Listing subfolders touches the ContentResolver — keep it off the main thread.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val subfolders = scanner.listSubfolders(uri)
+            _state.update { it.copy(localSubfolders = subfolders) }
+        }
+    }
+
+    fun toggleExcludedFolder(name: String) {
+        _state.update {
+            val excluded = if (name in it.excludedFolders) it.excludedFolders - name
+            else it.excludedFolders + name
+            it.copy(excludedFolders = excluded)
         }
     }
 
@@ -227,6 +243,7 @@ class WizardViewModel @Inject constructor(
                     direction = s.direction,
                     fileTypes = s.types,
                     customExtensions = parseCustomExtensions(s.customExtensions),
+                    excludedFolders = s.excludedFolders.toList().sorted(),
                     uploadLimitMb = s.upLimit.mbValue,
                     uploadLimitMode = s.upLimit.mode,
                     downloadLimitMb = s.downLimit.mbValue,

@@ -286,6 +286,8 @@ private fun OverviewTab(state: DetailsUiState, viewModel: DetailsViewModel) {
                 "Local folder" to Formatters.decodeTreePath(job.localFolderUri),
                 "Direction" to job.direction.label,
                 "File types" to typeNames,
+                "Excluded" to if (job.excludedFolders.isEmpty()) "None"
+                else job.excludedFolders.joinToString(", "),
                 "Upload limit" to limitLabel(job.uploadLimitMb, job.uploadLimitMode),
                 "Download limit" to limitLabel(job.downloadLimitMb, job.downloadLimitMode),
                 "Storage used" to (
