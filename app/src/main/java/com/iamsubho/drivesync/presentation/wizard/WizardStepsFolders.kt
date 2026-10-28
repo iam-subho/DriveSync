@@ -4,17 +4,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.RadioButtonChecked
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
@@ -112,17 +114,31 @@ fun Step2DriveFolder(state: WizardUiState, viewModel: WizardViewModel) {
         color = DsColors.TextPrimary,
     )
     Text(
-        text = buildAnnotatedString {
-            append("Browsing ")
-            withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = DsColors.TextPrimary)) {
-                append("My Drive")
-            }
-            append(" on ${state.selectedAccountEmail.orEmpty()}")
-        },
+        text = "Tap a folder to select it as the sync destination. Use the arrow to browse inside.",
         fontSize = 13.sp,
         color = DsColors.TextSecondary,
         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
     )
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = { viewModel.navigateDriveFolderPath(state.driveFolderPath.size - 1) },
+            enabled = state.driveFolderPath.isNotEmpty() && !state.foldersLoading,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = "Go to parent folder",
+                tint = if (state.driveFolderPath.isNotEmpty()) DsColors.Primary else DsColors.DisabledFg,
+            )
+        }
+        Text(
+            text = (listOf("My Drive") + state.driveFolderPath.map { it.name }).joinToString(" / "),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = DsColors.TextPrimary,
+            modifier = Modifier.weight(1f),
+        )
+    }
 
     if (state.foldersLoading) {
         Row(
@@ -145,6 +161,14 @@ fun Step2DriveFolder(state: WizardUiState, viewModel: WizardViewModel) {
     }
 
     Column {
+        if (!state.foldersLoading && state.driveFolders.isEmpty()) {
+            Text(
+                text = "No folders in this location. You can create one here.",
+                fontSize = 13.sp,
+                color = DsColors.TextTertiary,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
         state.driveFolders.forEach { folder ->
             val selected = state.selectedFolderId == folder.id
             RadioCard(
@@ -154,7 +178,7 @@ fun Step2DriveFolder(state: WizardUiState, viewModel: WizardViewModel) {
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -171,6 +195,16 @@ fun Step2DriveFolder(state: WizardUiState, viewModel: WizardViewModel) {
                             .padding(start = 12.dp),
                     )
                     RadioIcon(selected, modifier = Modifier.size(20.dp))
+                    IconButton(
+                        onClick = { viewModel.openDriveFolder(folder) },
+                        enabled = !state.foldersLoading,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowForward,
+                            contentDescription = "Browse inside ${folder.name}",
+                            tint = DsColors.Primary,
+                        )
+                    }
                 }
             }
         }
@@ -189,14 +223,28 @@ fun Step2DriveFolder(state: WizardUiState, viewModel: WizardViewModel) {
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
             containerColor = DsColors.Card,
-            title = { Text("Create new folder", fontSize = 18.sp, fontWeight = FontWeight.Medium) },
-            text = {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = { Text("Folder name") },
-                    singleLine = true,
+            title = {
+                Text(
+                    "Create new folder",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
                 )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Inside ${(listOf("My Drive") + state.driveFolderPath.map { it.name }).joinToString(" / ")}",
+                        fontSize = 13.sp,
+                        color = DsColors.TextSecondary,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        placeholder = { Text("Folder name") },
+                        singleLine = true,
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -275,4 +323,66 @@ fun Step3LocalFolder(state: WizardUiState, viewModel: WizardViewModel) {
         onClick = { pickerLauncher.launch(null) },
         height = 42.dp,
     )
+
+    if (state.localFolderUri != null) {
+        Text(
+            text = "Subfolders",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = DsColors.TextPrimary,
+            modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+        )
+        Text(
+            text = "Uncheck a folder to exclude it and everything inside it from sync.",
+            fontSize = 13.sp,
+            color = DsColors.TextSecondary,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        if (state.subfoldersLoading) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                CircularProgressIndicator(color = DsColors.Primary, modifier = Modifier.size(24.dp))
+            }
+        } else if (state.subfoldersError != null) {
+            Text(
+                text = state.subfoldersError,
+                fontSize = 13.sp,
+                color = DsColors.Error,
+            )
+        } else if (state.localSubfolders.isEmpty()) {
+            Text(
+                text = "This folder has no subfolders.",
+                fontSize = 13.sp,
+                color = DsColors.TextTertiary,
+            )
+        } else {
+            state.localSubfolders.forEach { folder ->
+                val parentExcluded = state.excludedSubfolders.any {
+                    folder.relativePath.startsWith("$it/")
+                }
+                val checked = !parentExcluded && folder.relativePath !in state.excludedSubfolders
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = (folder.depth * 18).dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = checked,
+                        enabled = !parentExcluded,
+                        onCheckedChange = { viewModel.toggleSubfolder(folder.relativePath) },
+                    )
+                    Text(
+                        text = folder.name,
+                        fontSize = 14.sp,
+                        color = if (parentExcluded) DsColors.TextTertiary else DsColors.TextPrimary,
+                    )
+                }
+            }
+        }
+    }
 }

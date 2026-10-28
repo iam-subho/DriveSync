@@ -140,6 +140,21 @@ class GoogleAuthManager @Inject constructor(
     }
 
     suspend fun authorizeDrive(email: String): AuthorizeResult {
+        val result = authorizationResult(email)
+        if (!result.hasResolution()) return AuthorizeResult.Granted
+        val pendingIntent = result.pendingIntent ?: throw DriveAuthException()
+        return AuthorizeResult.NeedsConsent(pendingIntent)
+    }
+
+    suspend fun driveAccessToken(email: String): String {
+        val result = authorizationResult(email)
+        if (result.hasResolution()) {
+            throw DriveAuthException(pendingIntent = result.pendingIntent)
+        }
+        return result.accessToken?.takeIf { it.isNotBlank() } ?: throw DriveAuthException()
+    }
+
+    private suspend fun authorizationResult(email: String): com.google.android.gms.auth.api.identity.AuthorizationResult {
         val request = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(Scope(DriveScopes.DRIVE)))
             .setAccount(Account(email, "com.google"))
@@ -150,11 +165,6 @@ class GoogleAuthManager @Inject constructor(
             android.util.Log.e(TAG, "authorizeDrive failed: ${e.message}", e)
             throw e
         }
-        val pendingIntent = result.pendingIntent
-        return if (result.hasResolution() && pendingIntent != null) {
-            AuthorizeResult.NeedsConsent(pendingIntent)
-        } else {
-            AuthorizeResult.Granted
-        }
+        return result
     }
 }

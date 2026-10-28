@@ -152,7 +152,7 @@ class HomeViewModel @Inject constructor(
 
     fun deleteJob(id: Long) {
         viewModelScope.launch {
-            syncController.pause(id)
+            syncController.cancel(id)
             jobRepository.deleteJob(id)
             showSnack("Sync job deleted")
         }

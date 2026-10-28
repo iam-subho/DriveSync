@@ -1,21 +1,74 @@
+# Android Studio / IntelliJ
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.idea/
+!/.idea/codeStyles/
+!/.idea/runConfigurations/
+
+# Gradle
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android local configuration
 local.properties
-*.py
-*.json
-/dd
-/docs
-/website
+
+# Android build outputs
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Generated files
+bin/
+gen/
+out/
+tmp/
+temp/
+
+# Kotlin
+.kotlin/
+
+# Native build files
+*.so
+*.o
+*.a
+
+# Signing keys and credentials
 *.jks
+*.keystore
+keystore.properties
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Python cache (if scripts are used)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Project-specific folders
+/dd/
+/docs/
+/website/
+
+# Optional: ignore JSON files only if they are generated
+*.json
+
+# Optional: ignore Python files only if they are not part of the project
+ *.py
+

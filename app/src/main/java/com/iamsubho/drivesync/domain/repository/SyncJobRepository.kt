@@ -11,4 +11,5 @@ interface SyncJobRepository {
     suspend fun createJob(job: SyncJob): Long
     suspend fun deleteJob(id: Long)
     suspend fun updateStatus(id: Long, status: SyncStatus, errorMessage: String? = null)
+    suspend fun tryMarkSyncing(id: Long): Boolean
 }

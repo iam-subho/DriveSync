@@ -21,6 +21,9 @@ interface CloudStorageProvider {
     /** Recursively lists every file under [rootFolderId] with paths relative to it. */
     suspend fun listAllFiles(accountEmail: String, rootFolderId: String): List<RemoteFile>
 
+    /** Fetches a Drive thumbnail using the account's authenticated Drive client. */
+    suspend fun downloadThumbnail(accountEmail: String, thumbnailLink: String): ByteArray
+
     /**
      * Streams [file] to the cloud. [folderIdForPath] resolves (and creates if needed) the remote
      * folder for a relative directory path (empty string = the job's root folder).

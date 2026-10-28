@@ -22,9 +22,22 @@ data class RemoteFile(
      * falling back to Drive's createdTime. Null for legacy/unreadable entries.
      */
     val deviceCreatedAt: Long? = null,
+    val thumbnailLink: String? = null,
 )
 
 data class RemoteFolder(
     val id: String,
     val name: String,
+)
+
+data class LocalSubfolder(
+    val relativePath: String,
+    val name: String,
+    val depth: Int,
+)
+
+data class SavedDriveFolder(
+    val accountEmail: String,
+    val folderId: String,
+    val folderName: String,
 )

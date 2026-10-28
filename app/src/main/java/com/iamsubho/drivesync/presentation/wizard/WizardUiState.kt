@@ -3,6 +3,7 @@ package com.iamsubho.drivesync.presentation.wizard
 import com.iamsubho.drivesync.domain.model.DriveAccount
 import com.iamsubho.drivesync.domain.model.FileTypeCategory
 import com.iamsubho.drivesync.domain.model.LimitMode
+import com.iamsubho.drivesync.domain.model.LocalSubfolder
 import com.iamsubho.drivesync.domain.model.RemoteFolder
 import com.iamsubho.drivesync.domain.model.SyncDirection
 
@@ -26,6 +27,7 @@ data class WizardUiState(
     val accounts: List<DriveAccount> = emptyList(),
     val selectedAccountEmail: String? = null,
     val driveFolders: List<RemoteFolder> = emptyList(),
+    val driveFolderPath: List<RemoteFolder> = emptyList(),
     val foldersLoading: Boolean = false,
     val folderError: String? = null,
     val selectedFolderId: String? = null,
@@ -33,6 +35,10 @@ data class WizardUiState(
     val localFolderUri: String? = null,
     val localFolderName: String? = null,
     val localFolderPath: String? = null,
+    val localSubfolders: List<LocalSubfolder> = emptyList(),
+    val excludedSubfolders: Set<String> = emptySet(),
+    val subfoldersLoading: Boolean = false,
+    val subfoldersError: String? = null,
     val batteryOk: Boolean = false,
     val types: Set<FileTypeCategory> = setOf(FileTypeCategory.IMAGES, FileTypeCategory.VIDEOS),
     val customExtensions: String = "",
@@ -53,7 +59,7 @@ data class WizardUiState(
         get() = when (step) {
             1 -> selectedAccountEmail != null
             2 -> selectedFolderId != null
-            3 -> localFolderUri != null
+            3 -> localFolderUri != null && !subfoldersLoading
             4 -> batteryOk
             5 -> types.isNotEmpty() && !(types == setOf(FileTypeCategory.CUSTOM) && customExtensions.isBlank())
             6 -> upLimit.isValid && downLimit.isValid

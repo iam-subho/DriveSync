@@ -1,5 +1,6 @@
 package com.iamsubho.drivesync.presentation.wizard
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -9,18 +10,26 @@ import androidx.lifecycle.viewModelScope
 import com.iamsubho.drivesync.domain.cloud.CloudStorageProvider
 import com.iamsubho.drivesync.domain.model.FileTypeCategory
 import com.iamsubho.drivesync.domain.model.LimitMode
+import com.iamsubho.drivesync.domain.model.SavedDriveFolder
 import com.iamsubho.drivesync.domain.model.RemoteFolder
 import com.iamsubho.drivesync.domain.model.SyncDirection
 import com.iamsubho.drivesync.domain.model.SyncJob
 import com.iamsubho.drivesync.domain.model.SyncStatus
 import com.iamsubho.drivesync.domain.repository.AccountRepository
 import com.iamsubho.drivesync.domain.repository.SyncJobRepository
+import com.iamsubho.drivesync.domain.repository.SavedDriveFolderRepository
+import com.iamsubho.drivesync.data.sync.LocalFolderScanner
+import com.iamsubho.drivesync.data.remote.DriveAuthException
 import com.iamsubho.drivesync.presentation.common.SnackBus
 import com.iamsubho.drivesync.presentation.util.BatteryOptimization
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -32,6 +41,8 @@ class WizardViewModel @Inject constructor(
     accountRepository: AccountRepository,
     private val jobRepository: SyncJobRepository,
     private val cloudProvider: CloudStorageProvider,
+    private val savedDriveFolderRepository: SavedDriveFolderRepository,
+    private val folderScanner: LocalFolderScanner,
     private val snackBus: SnackBus,
 ) : ViewModel() {
 
@@ -39,6 +50,10 @@ class WizardViewModel @Inject constructor(
     val uiState: StateFlow<WizardUiState> = _state
 
     private var folderLoadJob: Job? = null
+    private var localFolderLoadJob: Job? = null
+    private var pendingDriveAction: (() -> Unit)? = null
+    private val _driveAuthorizationRequests = MutableSharedFlow<PendingIntent>(extraBufferCapacity = 1)
+    val driveAuthorizationRequests: SharedFlow<PendingIntent> = _driveAuthorizationRequests
 
     init {
         viewModelScope.launch {
@@ -74,21 +89,36 @@ class WizardViewModel @Inject constructor(
                 selectedAccountEmail = email,
                 selectedFolderId = if (changed) null else it.selectedFolderId,
                 selectedFolderName = if (changed) null else it.selectedFolderName,
+                driveFolderPath = if (changed) emptyList() else it.driveFolderPath,
+                driveFolders = if (changed) emptyList() else it.driveFolders,
             )
         }
-        if (changed) loadDriveFolders()
+        if (changed) loadDriveFolders(parentId = null)
     }
 
     // ---- step 2: drive folder ----
 
-    fun loadDriveFolders() {
+    fun loadDriveFolders(parentId: String? = _state.value.driveFolderPath.lastOrNull()?.id) {
         val email = _state.value.selectedAccountEmail ?: return
         folderLoadJob?.cancel()
         folderLoadJob = viewModelScope.launch {
             _state.update { it.copy(foldersLoading = true, folderError = null) }
             try {
-                val folders = cloudProvider.listFolders(email, parentId = null)
+                val folders = cloudProvider.listFolders(email, parentId = parentId)
                 _state.update { it.copy(driveFolders = folders, foldersLoading = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: DriveAuthException) {
+                _state.update { it.copy(foldersLoading = false, folderError = null) }
+                val pendingIntent = e.pendingIntent
+                if (pendingIntent != null) {
+                    pendingDriveAction = { loadDriveFolders(parentId) }
+                    _driveAuthorizationRequests.emit(pendingIntent)
+                } else {
+                    _state.update {
+                        it.copy(folderError = "Drive access is required. Please reconnect this account and try again.")
+                    }
+                }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -100,6 +130,19 @@ class WizardViewModel @Inject constructor(
         }
     }
 
+    fun openDriveFolder(folder: RemoteFolder) {
+        _state.update { it.copy(driveFolderPath = it.driveFolderPath + folder) }
+        loadDriveFolders(folder.id)
+    }
+
+    fun navigateDriveFolderPath(pathIndex: Int) {
+        val currentPath = _state.value.driveFolderPath
+        if (pathIndex !in 0..currentPath.size) return
+        val newPath = currentPath.take(pathIndex)
+        _state.update { it.copy(driveFolderPath = newPath) }
+        loadDriveFolders(newPath.lastOrNull()?.id)
+    }
+
     fun pickFolder(folder: RemoteFolder) {
         _state.update { it.copy(selectedFolderId = folder.id, selectedFolderName = folder.name) }
     }
@@ -107,10 +150,11 @@ class WizardViewModel @Inject constructor(
     fun createFolder(name: String) {
         val email = _state.value.selectedAccountEmail ?: return
         if (name.isBlank()) return
+        val parentId = _state.value.driveFolderPath.lastOrNull()?.id
         viewModelScope.launch {
             _state.update { it.copy(foldersLoading = true, folderError = null) }
             try {
-                val folder = cloudProvider.createFolder(email, parentId = null, name = name.trim())
+                val folder = cloudProvider.createFolder(email, parentId = parentId, name = name.trim())
                 _state.update {
                     it.copy(
                         driveFolders = it.driveFolders + folder,
@@ -118,6 +162,19 @@ class WizardViewModel @Inject constructor(
                         selectedFolderName = folder.name,
                         foldersLoading = false,
                     )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: DriveAuthException) {
+                _state.update { it.copy(foldersLoading = false, folderError = null) }
+                val pendingIntent = e.pendingIntent
+                if (pendingIntent != null) {
+                    pendingDriveAction = { createFolder(name) }
+                    _driveAuthorizationRequests.emit(pendingIntent)
+                } else {
+                    _state.update {
+                        it.copy(folderError = "Drive access is required. Please reconnect this account and try again.")
+                    }
                 }
             } catch (e: Exception) {
                 _state.update {
@@ -130,9 +187,25 @@ class WizardViewModel @Inject constructor(
         }
     }
 
+    fun onDriveAuthorizationResult(granted: Boolean) {
+        val retry = pendingDriveAction
+        pendingDriveAction = null
+        if (granted) {
+            retry?.invoke()
+        } else {
+            _state.update {
+                it.copy(
+                    foldersLoading = false,
+                    folderError = "Drive access was not granted. You can try again.",
+                )
+            }
+        }
+    }
+
     // ---- step 3: local folder ----
 
     fun onLocalPicked(uri: Uri) {
+        localFolderLoadJob?.cancel()
         appContext.contentResolver.takePersistableUriPermission(
             uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
@@ -144,7 +217,41 @@ class WizardViewModel @Inject constructor(
                 localFolderName = doc?.name ?: "Selected folder",
                 localFolderPath = com.iamsubho.drivesync.presentation.common.Formatters
                     .decodeTreePath(uri.toString()),
+                localSubfolders = emptyList(),
+                excludedSubfolders = emptySet(),
+                subfoldersLoading = true,
+                subfoldersError = null,
             )
+        }
+        localFolderLoadJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val folders = folderScanner.listSubfolders(uri)
+                _state.update { it.copy(localSubfolders = folders, subfoldersLoading = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        subfoldersLoading = false,
+                        subfoldersError = e.message ?: "Could not read local subfolders",
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleSubfolder(path: String) {
+        _state.update { state ->
+            val parentExcluded = state.excludedSubfolders.any {
+                path.startsWith("$it/")
+            }
+            if (parentExcluded) return@update state
+            val exclusions = if (path in state.excludedSubfolders) {
+                state.excludedSubfolders - path
+            } else {
+                state.excludedSubfolders + path
+            }
+            state.copy(excludedSubfolders = exclusions)
         }
     }
 
@@ -224,6 +331,7 @@ class WizardViewModel @Inject constructor(
                     driveFolderName = s.selectedFolderName!!,
                     localFolderUri = s.localFolderUri!!,
                     localFolderName = s.localFolderName ?: "Local folder",
+                    excludedSubfolders = s.excludedSubfolders,
                     direction = s.direction,
                     fileTypes = s.types,
                     customExtensions = parseCustomExtensions(s.customExtensions),
@@ -237,9 +345,17 @@ class WizardViewModel @Inject constructor(
                     lastSyncAt = null,
                     createdAt = System.currentTimeMillis(),
                 )
+                savedDriveFolderRepository.save(
+                    SavedDriveFolder(job.accountEmail, job.driveFolderId, job.driveFolderName),
+                )
                 jobRepository.createJob(job)
                 snackBus.post("Sync job \"${job.name}\" created")
                 onDone()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("WizardViewModel", "Could not create sync job", e)
+                snackBus.post(e.message ?: "Could not create sync job")
             } finally {
                 _state.update { it.copy(creating = false) }
             }

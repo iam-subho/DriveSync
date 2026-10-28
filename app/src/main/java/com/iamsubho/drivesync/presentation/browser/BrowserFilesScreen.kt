@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +67,7 @@ import com.iamsubho.drivesync.presentation.common.PrimaryButton
 import com.iamsubho.drivesync.presentation.theme.DsColors
 import com.iamsubho.drivesync.presentation.util.DriveAppLauncher
 import com.iamsubho.drivesync.presentation.wizard.wizardFieldColors
+import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -235,6 +238,8 @@ fun BrowserFilesScreen(
                     FileRow(
                         file = file,
                         selected = file.id in state.selectedIds,
+                        thumbnail = state.thumbnails[file.id],
+                        onLoadThumbnail = { viewModel.loadThumbnail(file) },
                         onToggleSelect = { viewModel.toggleSelect(file.id) },
                         onClick = {
                             if (!DriveAppLauncher.openFileInDriveApp(context, file.id)) {
@@ -390,9 +395,15 @@ private fun DateChip(
 private fun FileRow(
     file: RemoteFile,
     selected: Boolean,
+    thumbnail: ByteArray?,
+    onLoadThumbnail: () -> Unit,
     onToggleSelect: () -> Unit,
     onClick: () -> Unit,
 ) {
+    val isImage = file.name.substringAfterLast('.', "").lowercase() in ExtensionDefaults.IMAGES
+    LaunchedEffect(file.id, file.thumbnailLink) {
+        if (isImage) onLoadThumbnail()
+    }
     DsCard(
         cornerRadius = 12.dp,
         modifier = Modifier.fillMaxWidth(),
@@ -417,12 +428,23 @@ private fun FileRow(
                     modifier = Modifier.size(20.dp),
                 )
             }
-            Icon(
-                imageVector = fileTypeIcon(file.name),
-                contentDescription = null,
-                tint = DsColors.Primary,
-                modifier = Modifier.size(20.dp),
-            )
+            if (isImage && thumbnail != null) {
+                AsyncImage(
+                    model = thumbnail,
+                    contentDescription = file.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                )
+            } else {
+                Icon(
+                    imageVector = fileTypeIcon(file.name),
+                    contentDescription = null,
+                    tint = DsColors.Primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)

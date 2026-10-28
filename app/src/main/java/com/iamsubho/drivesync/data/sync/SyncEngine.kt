@@ -41,6 +41,7 @@ class SyncEngine @Inject constructor(
 ) {
     sealed interface Result {
         data object Success : Result
+        data object Paused : Result
 
         /** Some transfers failed transiently; the worker should retry after backoff. */
         data object Retry : Result
@@ -102,7 +103,7 @@ class SyncEngine @Inject constructor(
         val job = jobDao.get(jobId)!!.toDomain()
         val remotes = provider.listAllFiles(job.accountEmail, job.driveFolderId)
         android.util.Log.i(TAG, "plan: ${remotes.size} remote files listed")
-        val locals = scanner.scan(treeUri)
+        val locals = scanner.scan(treeUri, job.excludedSubfolders)
         android.util.Log.i(TAG, "plan: ${locals.size} local files scanned")
         val filter = FileFilter(
             fileTypes = job.fileTypes,
@@ -120,6 +121,7 @@ class SyncEngine @Inject constructor(
             downloadLimitMode = job.downloadLimitMode,
             deleteAfterUpload = job.deleteAfterUpload,
             localMd5 = { local -> scanner.md5(local.uri) },
+            excludedSubfolders = job.excludedSubfolders,
         )
 
         val ops = mutableListOf<TransferQueueEntity>()
@@ -181,6 +183,7 @@ class SyncEngine @Inject constructor(
 
         for ((index, op) in ready.withIndex()) {
             currentCoroutineContext().ensureActive()
+            if (isPaused(jobId)) return Result.Paused
             queueDao.update(op.copy(state = TransferQueueEntity.STATE_RUNNING))
 
             val emitProgress: (Long) -> Unit = { currentBytes ->
@@ -269,6 +272,7 @@ class SyncEngine @Inject constructor(
             }
         }
 
+        if (isPaused(jobId)) return Result.Paused
         val stillPending = queueDao.countPending(jobId)
         android.util.Log.i(TAG, "execute: done; stillPending=$stillPending transientFailures=$hadTransientFailures")
         return if (stillPending > 0 || hadTransientFailures) {
@@ -336,6 +340,9 @@ class SyncEngine @Inject constructor(
     suspend fun resetInterrupted(jobId: Long) {
         queueDao.resetRunning(jobId)
     }
+
+    private suspend fun isPaused(jobId: Long): Boolean =
+        jobDao.get(jobId)?.status in setOf(SyncStatus.PAUSING.name, SyncStatus.PAUSED.name)
 
     private suspend fun log(
         jobId: Long,

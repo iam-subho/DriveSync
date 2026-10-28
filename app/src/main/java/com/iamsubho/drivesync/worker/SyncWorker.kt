@@ -34,15 +34,34 @@ class SyncWorker @AssistedInject constructor(
         val jobId = inputData.getLong(KEY_JOB_ID, -1L)
         if (jobId == -1L) return Result.failure()
         val job = jobRepository.getJob(jobId) ?: return Result.failure()
-        val isPeriodic = inputData.getBoolean(KEY_IS_PERIODIC, false)
 
-        // Scheduled runs respect a user-initiated pause; only Start lifts it.
-        if (isPeriodic && job.status == SyncStatus.PAUSED) return Result.success()
+        // A paused job may have a queued periodic run; only Start lifts it.
+        if (job.status == SyncStatus.PAUSED) return Result.success()
 
         // Manual and periodic runs are separate unique works — never sync the same job twice.
         if (!JobLocks.tryAcquire(jobId)) return Result.success()
+        val currentJob = jobRepository.getJob(jobId)
+        if (currentJob == null) {
+            JobLocks.release(jobId)
+            return Result.failure()
+        }
+        if (currentJob.status == SyncStatus.PAUSED) {
+            JobLocks.release(jobId)
+            return Result.success()
+        }
+        if (currentJob.status == SyncStatus.PAUSING) {
+            jobRepository.updateStatus(jobId, SyncStatus.PAUSED)
+            JobLocks.release(jobId)
+            return Result.success()
+        }
 
-        jobRepository.updateStatus(jobId, SyncStatus.SYNCING)
+        if (!jobRepository.tryMarkSyncing(jobId)) {
+            if (jobRepository.getJob(jobId)?.status == SyncStatus.PAUSING) {
+                jobRepository.updateStatus(jobId, SyncStatus.PAUSED)
+            }
+            JobLocks.release(jobId)
+            return Result.success()
+        }
 
         // Android 12+ forbids foreground promotion while the app is in the background
         // (e.g. a WorkManager retry firing later). The worker may still run un-promoted
@@ -68,6 +87,10 @@ class SyncWorker @AssistedInject constructor(
                     notifications.completionNotification(job.name, success = true, detail = null)
                     Result.success()
                 }
+                SyncEngine.Result.Paused -> {
+                    jobRepository.updateStatus(jobId, SyncStatus.PAUSED)
+                    Result.success()
+                }
                 is SyncEngine.Result.Retry -> Result.retry()
                 is SyncEngine.Result.AuthNeeded -> {
                     notifications.completionNotification(
@@ -91,10 +114,13 @@ class SyncWorker @AssistedInject constructor(
         } finally {
             // Runs on success, failure, and cancellation (pause/constraint loss):
             // release interrupted rows and clear the live progress card.
-            JobLocks.release(jobId)
             withContext(NonCancellable) {
-                engine.resetInterrupted(jobId)
-                progressBus.update(jobId, null)
+                try {
+                    engine.resetInterrupted(jobId)
+                    progressBus.update(jobId, null)
+                } finally {
+                    JobLocks.release(jobId)
+                }
             }
         }
     }

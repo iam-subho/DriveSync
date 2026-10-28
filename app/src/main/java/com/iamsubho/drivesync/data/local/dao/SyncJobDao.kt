@@ -33,6 +33,12 @@ interface SyncJobDao {
     @Query("UPDATE sync_jobs SET status = :status, errorMessage = :errorMessage WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String, errorMessage: String?)
 
+    @Query("UPDATE sync_jobs SET status = :status, errorMessage = :errorMessage WHERE id = :id AND status != 'PAUSING'")
+    suspend fun updateStatusForStart(id: Long, status: String, errorMessage: String?): Int
+
+    @Query("UPDATE sync_jobs SET status = :status, errorMessage = :errorMessage WHERE id = :id AND status = 'SYNCING'")
+    suspend fun updateStatusIfSyncing(id: Long, status: String, errorMessage: String?): Int
+
     @Query("UPDATE sync_jobs SET pendingCount = :pending WHERE id = :id")
     suspend fun updatePending(id: Long, pending: Int)
 

@@ -2,10 +2,12 @@ package com.iamsubho.drivesync.di
 
 import com.iamsubho.drivesync.data.repository.ExtensionRepositoryImpl
 import com.iamsubho.drivesync.data.repository.SyncControllerImpl
+import com.iamsubho.drivesync.data.repository.SavedDriveFolderRepositoryImpl
 import com.iamsubho.drivesync.data.repository.SyncJobRepositoryImpl
 import com.iamsubho.drivesync.data.repository.TransferLogRepositoryImpl
 import com.iamsubho.drivesync.domain.repository.ExtensionRepository
 import com.iamsubho.drivesync.domain.repository.SyncController
+import com.iamsubho.drivesync.domain.repository.SavedDriveFolderRepository
 import com.iamsubho.drivesync.domain.repository.SyncJobRepository
 import com.iamsubho.drivesync.domain.repository.TransferLogRepository
 import dagger.Binds
@@ -19,6 +21,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindSyncJobRepository(impl: SyncJobRepositoryImpl): SyncJobRepository
+
+    @Binds
+    abstract fun bindSavedDriveFolderRepository(impl: SavedDriveFolderRepositoryImpl): SavedDriveFolderRepository
 
     @Binds
     abstract fun bindTransferLogRepository(impl: TransferLogRepositoryImpl): TransferLogRepository

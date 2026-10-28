@@ -8,6 +8,7 @@ data class SyncJob(
     val driveFolderName: String,
     val localFolderUri: String,
     val localFolderName: String,
+    val excludedSubfolders: Set<String> = emptySet(),
     val direction: SyncDirection,
     val fileTypes: Set<FileTypeCategory>,
     val customExtensions: List<String>,

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.util.Log
 import java.util.Calendar
 import java.util.TimeZone
 import javax.inject.Inject
@@ -20,6 +21,7 @@ data class BrowserFilesUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val allFiles: List<RemoteFile> = emptyList(),
+    val thumbnails: Map<String, ByteArray> = emptyMap(),
     val query: String = "",
     /** UTC-midnight millis from the Material 3 date picker; null = no date filter. */
     val selectedDayUtcMillis: Long? = null,
@@ -45,6 +47,7 @@ class BrowserFilesViewModel @Inject constructor(
         BrowserFilesUiState(email = email, folderName = folderName),
     )
     val uiState: StateFlow<BrowserFilesUiState> = _state
+    private val thumbnailRequests = mutableSetOf<String>()
 
     init {
         load()
@@ -61,6 +64,22 @@ class BrowserFilesViewModel @Inject constructor(
                 _state.update {
                     it.copy(loading = false, error = e.message ?: "Could not load files")
                 }
+            }
+        }
+    }
+
+    fun loadThumbnail(file: RemoteFile) {
+        val thumbnailLink = file.thumbnailLink ?: return
+        if (!thumbnailRequests.add(file.id) || file.id in _state.value.thumbnails) return
+        viewModelScope.launch {
+            try {
+                val thumbnail = cloudProvider.downloadThumbnail(email, thumbnailLink)
+                _state.update { state ->
+                    state.copy(thumbnails = state.thumbnails + (file.id to thumbnail))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not load Drive thumbnail for file ${file.id}", e)
+                thumbnailRequests.remove(file.id)
             }
         }
     }
@@ -107,6 +126,7 @@ class BrowserFilesViewModel @Inject constructor(
                 applyFilter(
                     s.copy(
                         allFiles = s.allFiles.filterNot { it.id in deleted },
+                        thumbnails = s.thumbnails - deleted,
                         selectedIds = failed,
                         deleting = false,
                         notice = when {
@@ -145,5 +165,9 @@ class BrowserFilesViewModel @Inject constructor(
         val start = local.timeInMillis
         local.add(Calendar.DAY_OF_MONTH, 1)
         return start to local.timeInMillis
+    }
+
+    private companion object {
+        const val TAG = "BrowserFilesViewModel"
     }
 }

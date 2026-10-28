@@ -384,7 +384,8 @@ private fun JobCard(
     modifier: Modifier = Modifier,
 ) {
     val job = item.job
-    val isSyncing = job.status == SyncStatus.SYNCING
+    val isSyncing = job.status == SyncStatus.SYNCING || job.status == SyncStatus.PAUSING
+    val isPausing = job.status == SyncStatus.PAUSING
     val lastSync = job.lastSyncAt?.let(Formatters::formatTimestamp) ?: "Never"
 
     DsCard(modifier = modifier.fillMaxWidth(), onClick = onOpen) {
@@ -460,6 +461,12 @@ private fun JobCard(
             ) {
                 if (!isSyncing) {
                     TonalButton(text = "Start", icon = Icons.Outlined.PlayArrow, onClick = onStart)
+                } else if (isPausing) {
+                    Text(
+                        text = "Finishing current file…",
+                        fontSize = 12.sp,
+                        color = DsColors.TextSecondary,
+                    )
                 } else {
                     TonalButton(
                         text = "Pause", icon = Icons.Outlined.Pause, onClick = onPause,

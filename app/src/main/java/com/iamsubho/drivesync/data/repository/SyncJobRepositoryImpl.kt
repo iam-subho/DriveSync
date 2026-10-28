@@ -44,4 +44,7 @@ class SyncJobRepositoryImpl @Inject constructor(
     override suspend fun updateStatus(id: Long, status: SyncStatus, errorMessage: String?) {
         jobDao.updateStatus(id, status.name, errorMessage)
     }
+
+    override suspend fun tryMarkSyncing(id: Long): Boolean =
+        jobDao.updateStatusForStart(id, SyncStatus.SYNCING.name, null) > 0
 }

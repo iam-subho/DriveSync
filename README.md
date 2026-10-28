@@ -17,8 +17,10 @@ WorkManager, and the Google Drive API v3.
   Credential Manager self-cancels (common on some OEM skins).
 - **Sync jobs** — created through a 9-step wizard:
   1. Choose Drive account
-  2. Choose (or create) a Drive folder
-  3. Choose a local folder (SAF; permission persisted for background sync)
+  2. Browse nested My Drive folders and choose a destination (or create a folder inside the
+     currently browsed parent)
+  3. Choose a local folder (SAF; permission persisted for background sync) and uncheck any
+     subfolder branches that should be excluded from sync
   4. Battery optimization exemption (required for reliable background sync)
   5. File-type filters — All / Images / Videos / Documents / Audio / Archives / custom extensions
   6. Size limits per direction — *No limit* or *Custom MB*, with a mode:
@@ -31,8 +33,10 @@ WorkManager, and the Google Drive API v3.
   9. Review and create (job name + full summary)
 - **Sync engine** — snapshot → plan → durable queue → streaming transfers:
   - Conflict resolution: **Newest Wins** (strategy interface ready for more modes)
-  - Duplicate detection: name + size + modified time, MD5 hash check when needed
-  - Resumable after interruption, reboot, or pause (queue persisted in Room)
+  - Duplicate detection: identical content at the matching Drive path is skipped using MD5;
+    changed content still follows Newest Wins
+  - Resumable after interruption, reboot, or pause (queue persisted in Room); pause finishes
+    the current file before starting no further transfers
   - Retry with exponential backoff (30s → 30min, max 5 attempts per file)
   - Foreground notification with progress, speed, and current file (degrades gracefully when
     Android denies foreground promotion in the background)
@@ -43,8 +47,10 @@ WorkManager, and the Google Drive API v3.
 - **Job details** — Overview tab (live progress, speed, ETA, stat tiles, full configuration
   including the complete local path and next-run schedule) and Logs tab (paginated transfer
   history with success/failed/skipped reasons, clear logs).
-- **See Files browser** — each account card has a "See Files" button listing the Drive folders
-  synced by the app. Opening a folder shows all its files (recursive) with:
+- **See Files browser** — each account card has a "See Files" button listing folders saved in
+  the app, including folders added from Drive even when they have no sync job. Removing a sync
+  job keeps its Drive folder and saved-folder entry; each entry can be removed from the app list
+  without deleting anything in Drive. Opening a folder shows all its files (recursive) with:
   - name search and a **date filter** on the file's original device date (stored in Drive
     metadata `appProperties.deviceCreatedAt` + `createdTime` at upload)
   - **multi-select checkboxes with bulk delete from Drive** (confirmation required)

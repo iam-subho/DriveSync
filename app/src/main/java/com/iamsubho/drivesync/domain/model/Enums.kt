@@ -13,7 +13,7 @@ enum class LimitMode {
 
 enum class FileTypeCategory { ALL, IMAGES, VIDEOS, DOCUMENTS, AUDIO, ARCHIVES, CUSTOM }
 
-enum class SyncStatus { NEVER_SYNCED, UP_TO_DATE, SYNCING, PAUSED, ERROR }
+enum class SyncStatus { NEVER_SYNCED, UP_TO_DATE, SYNCING, PAUSING, PAUSED, ERROR }
 
 enum class TransferResult { SUCCESS, FAILED, SKIPPED }
 

@@ -37,6 +37,7 @@ class SyncPlanner(private val mtimeToleranceMs: Long = 2000L) {
         downloadLimitMode: LimitMode,
         deleteAfterUpload: Boolean = false,
         localMd5: (LocalFile) -> String?,
+        excludedSubfolders: Set<String> = emptySet(),
     ): List<PlanEntry> {
         // Delete-after-upload jobs intentionally remove local copies of uploaded files;
         // downloading remote-only files back would ping-pong them forever. Download-only
@@ -47,6 +48,7 @@ class SyncPlanner(private val mtimeToleranceMs: Long = 2000L) {
         val matchedRemoteIds = HashSet<String>()
 
         for (local in locals) {
+            if (isExcluded(local.relativePath, excludedSubfolders)) continue
             if (!filter.matchesType(local.name)) continue
             val remote = remotesByPath[local.relativePath]
 
@@ -58,16 +60,17 @@ class SyncPlanner(private val mtimeToleranceMs: Long = 2000L) {
             }
             matchedRemoteIds += remote.id
 
-            val mtimeDiff = local.modifiedAt - remote.modifiedAt
             val sameSize = local.sizeBytes == remote.sizeBytes
-            if (sameSize && abs(mtimeDiff) <= mtimeToleranceMs) continue // unchanged
-
-            if (sameSize && isHashIdentical(local, remote, localMd5)) {
+            val matchingContent = sameSize && isHashIdentical(local, remote, localMd5)
+            if (matchingContent) {
                 entries += PlanEntry.Skip(
                     local.name, local.sizeBytes, TransferDirection.UPLOAD, "Identical hash on Drive",
                 )
                 continue
             }
+
+            val mtimeDiff = local.modifiedAt - remote.modifiedAt
+            if (sameSize && remote.md5 == null && abs(mtimeDiff) <= mtimeToleranceMs) continue
 
             // Newest Wins, constrained by direction.
             if (mtimeDiff >= 0) { // local is newer (ties favor local)
@@ -93,6 +96,7 @@ class SyncPlanner(private val mtimeToleranceMs: Long = 2000L) {
 
         for (remote in remotes) {
             if (remote.id in matchedRemoteIds) continue
+            if (isExcluded(remote.relativePath, excludedSubfolders)) continue
             if (!filter.matchesType(remote.name)) continue
             if (direction != SyncDirection.UPLOAD_ONLY && !skipRemoteOnly) {
                 entries += downloadOrSkip(remote, downloadLimitMb, downloadLimitMode)
@@ -109,6 +113,13 @@ class SyncPlanner(private val mtimeToleranceMs: Long = 2000L) {
         val remoteMd5 = remote.md5 ?: return false
         val md5 = localMd5(local) ?: return false
         return md5.equals(remoteMd5, ignoreCase = true)
+    }
+
+    private fun isExcluded(relativePath: String, excludedSubfolders: Set<String>): Boolean {
+        val directoryPath = relativePath.substringBeforeLast('/', "")
+        return excludedSubfolders.any {
+            directoryPath == it || directoryPath.startsWith("$it/")
+        }
     }
 
     private fun uploadOrSkip(local: LocalFile, overwriteId: String?, limitMb: Int?, mode: LimitMode): PlanEntry =

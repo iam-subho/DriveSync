@@ -1,5 +1,9 @@
 package com.iamsubho.drivesync.presentation.wizard
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +24,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +45,19 @@ fun WizardScreen(
     viewModel: WizardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val authorizationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        viewModel.onDriveAuthorizationResult(result.resultCode == Activity.RESULT_OK)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.driveAuthorizationRequests.collect { pendingIntent ->
+            authorizationLauncher.launch(
+                IntentSenderRequest.Builder(pendingIntent.intentSender).build(),
+            )
+        }
+    }
 
     fun goBack() {
         if (!viewModel.back()) onExit()

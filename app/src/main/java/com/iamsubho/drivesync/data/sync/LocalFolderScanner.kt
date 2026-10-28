@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.documentfile.provider.DocumentFile
 import com.iamsubho.drivesync.domain.model.LocalFile
+import com.iamsubho.drivesync.domain.model.LocalSubfolder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.io.InputStream
@@ -31,18 +32,50 @@ class LocalFolderScanner @Inject constructor(
         return root.exists() && root.canRead()
     }
 
-    fun scan(treeUri: Uri): List<LocalFile> {
+    fun scan(treeUri: Uri, excludedSubfolders: Set<String> = emptySet()): List<LocalFile> {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
         val results = mutableListOf<LocalFile>()
-        walk(root, "", results)
+        walk(root, "", results, excludedSubfolders)
         return results
     }
 
-    private fun walk(dir: DocumentFile, prefix: String, out: MutableList<LocalFile>) {
+    fun listSubfolders(treeUri: Uri): List<LocalSubfolder> {
+        val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
+        val results = mutableListOf<LocalSubfolder>()
+        listDirectories(root, "", 0, results)
+        return results
+    }
+
+    private fun listDirectories(
+        dir: DocumentFile,
+        prefix: String,
+        depth: Int,
+        out: MutableList<LocalSubfolder>,
+    ) {
+        for (child in dir.listFiles()) {
+            if (!child.isDirectory) continue
+            val name = child.name ?: continue
+            val path = "$prefix$name"
+            out += LocalSubfolder(path, name, depth)
+            listDirectories(child, "$path/", depth + 1, out)
+        }
+    }
+
+    private fun walk(
+        dir: DocumentFile,
+        prefix: String,
+        out: MutableList<LocalFile>,
+        excludedSubfolders: Set<String>,
+    ) {
         for (child in dir.listFiles()) {
             val name = child.name ?: continue
             when {
-                child.isDirectory -> walk(child, "$prefix$name/", out)
+                child.isDirectory -> {
+                    val relativePath = "$prefix$name"
+                    if (excludedSubfolders.none { relativePath == it || relativePath.startsWith("$it/") }) {
+                        walk(child, "$relativePath/", out, excludedSubfolders)
+                    }
+                }
                 child.isFile && !name.endsWith(TMP_SUFFIX) -> out += LocalFile(
                     name = name,
                     relativePath = "$prefix$name",

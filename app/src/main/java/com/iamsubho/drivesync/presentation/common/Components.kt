@@ -64,6 +64,7 @@ data class StatusChipStyle(val label: String, val bg: Color, val fg: Color, val 
 fun statusChipStyle(status: SyncStatus): StatusChipStyle = when (status) {
     SyncStatus.UP_TO_DATE -> StatusChipStyle("Up to date", DsColors.ChipSuccessBg, DsColors.ChipSuccessFg, Icons.Outlined.CheckCircle)
     SyncStatus.SYNCING -> StatusChipStyle("Syncing", DsColors.ChipSyncBg, DsColors.ChipSyncFg, Icons.Outlined.Sync)
+    SyncStatus.PAUSING -> StatusChipStyle("Pausing", DsColors.ChipNeutralBg, DsColors.ChipNeutralFg, Icons.Outlined.PauseCircle)
     SyncStatus.PAUSED -> StatusChipStyle("Paused", DsColors.ChipNeutralBg, DsColors.ChipNeutralFg, Icons.Outlined.PauseCircle)
     SyncStatus.NEVER_SYNCED -> StatusChipStyle("Never synced", DsColors.ChipNeutralBg, DsColors.ChipNeutralFg, Icons.Outlined.Schedule)
     SyncStatus.ERROR -> StatusChipStyle("Error", DsColors.ChipErrorBg, DsColors.ChipErrorFg, Icons.Outlined.ErrorOutline)

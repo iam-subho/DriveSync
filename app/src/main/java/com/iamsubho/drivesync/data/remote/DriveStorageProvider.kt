@@ -5,6 +5,7 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.googleapis.media.MediaHttpDownloader
 import com.google.api.client.googleapis.media.MediaHttpUploader
 import com.google.api.client.http.InputStreamContent
+import com.google.api.client.http.GenericUrl
 import com.google.api.client.util.DateTime
 import com.iamsubho.drivesync.domain.cloud.CloudStorageProvider
 import com.iamsubho.drivesync.domain.model.LocalFile
@@ -13,6 +14,7 @@ import com.iamsubho.drivesync.domain.model.RemoteFolder
 import com.iamsubho.drivesync.domain.model.StorageQuota
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.ArrayDeque
@@ -23,7 +25,7 @@ import com.google.api.services.drive.model.File as DriveFile
 private const val FOLDER_MIME = "application/vnd.google-apps.folder"
 private const val FILE_FIELDS = "id,name,size,modifiedTime,md5Checksum"
 private const val PAGE_FIELDS =
-    "nextPageToken,files(id,name,mimeType,size,modifiedTime,md5Checksum,createdTime,appProperties)"
+    "nextPageToken,files(id,name,mimeType,size,modifiedTime,md5Checksum,createdTime,appProperties,thumbnailLink)"
 
 /** appProperties key holding the device file's timestamp at upload (epoch millis). */
 private const val PROP_DEVICE_CREATED_AT = "deviceCreatedAt"
@@ -49,7 +51,17 @@ class DriveStorageProvider @Inject constructor(
                     .setPageSize(1000)
                     .setPageToken(pageToken)
                     .execute()
-                page.files?.forEach { folders += RemoteFolder(it.id, it.name) }
+                page.files?.forEach { file ->
+                    val folder = file.toRemoteFolderOrNull()
+                    if (folder == null) {
+                        android.util.Log.w(
+                            "DriveStorageProvider",
+                            "Ignoring Drive folder with missing ID or name under parent $parent",
+                        )
+                    } else {
+                        folders += folder
+                    }
+                }
                 pageToken = page.nextPageToken
             } while (pageToken != null)
             folders
@@ -57,6 +69,7 @@ class DriveStorageProvider @Inject constructor(
 
     override suspend fun createFolder(accountEmail: String, parentId: String?, name: String): RemoteFolder =
         runDrive {
+            require(name.isNotBlank()) { "Drive folder name must not be empty" }
             val drive = serviceFactory.driveFor(accountEmail)
             val meta = DriveFile().apply {
                 this.name = name
@@ -64,8 +77,15 @@ class DriveStorageProvider @Inject constructor(
                 parents = listOf(parentId ?: "root")
             }
             val created = drive.files().create(meta).setFields("id,name").execute()
-            RemoteFolder(created.id, created.name)
+            created.toRemoteFolderOrNull()
+                ?: throw IOException("Drive created a folder without a valid ID or name")
         }
+
+    private fun DriveFile.toRemoteFolderOrNull(): RemoteFolder? {
+        val folderId = id?.takeIf { it.isNotBlank() } ?: return null
+        val folderName = name?.takeIf { it.isNotBlank() } ?: return null
+        return RemoteFolder(folderId, folderName)
+    }
 
     override suspend fun listAllFiles(accountEmail: String, rootFolderId: String): List<RemoteFile> =
         runDrive {
@@ -99,6 +119,7 @@ class DriveStorageProvider @Inject constructor(
                                 md5 = f.md5Checksum,
                                 deviceCreatedAt = f.appProperties?.get(PROP_DEVICE_CREATED_AT)?.toLongOrNull()
                                     ?: f.createdTime?.value,
+                                thumbnailLink = f.thumbnailLink,
                             )
                         }
                     }
@@ -106,6 +127,16 @@ class DriveStorageProvider @Inject constructor(
                 } while (pageToken != null)
             }
             results
+        }
+
+    override suspend fun downloadThumbnail(accountEmail: String, thumbnailLink: String): ByteArray =
+        runDrive {
+            val drive = serviceFactory.driveFor(accountEmail)
+            drive.requestFactory
+                .buildGetRequest(GenericUrl(thumbnailLink))
+                .execute()
+                .content
+                .use { it.readBytes() }
         }
 
     override suspend fun upload(

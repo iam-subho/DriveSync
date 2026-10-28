@@ -4,6 +4,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
+import android.net.Uri
 import com.iamsubho.drivesync.domain.model.FileTypeCategory
 import com.iamsubho.drivesync.domain.model.LimitMode
 import com.iamsubho.drivesync.domain.model.SyncDirection
@@ -30,6 +32,7 @@ data class SyncJobEntity(
     val driveFolderName: String,
     val localFolderUri: String,
     val localFolderName: String,
+    @ColumnInfo(defaultValue = "''") val excludedSubfolders: String = "",
     val direction: String,
     val fileTypes: String,          // comma-joined FileTypeCategory names
     val customExtensions: String,   // comma-joined lowercase extensions
@@ -56,6 +59,10 @@ data class SyncJobEntity(
         driveFolderName = driveFolderName,
         localFolderUri = localFolderUri,
         localFolderName = localFolderName,
+        excludedSubfolders = excludedSubfolders.split('\n')
+            .filter { it.isNotBlank() }
+            .map { Uri.decode(it) }
+            .toSet(),
         direction = SyncDirection.valueOf(direction),
         fileTypes = fileTypes.split(',').filter { it.isNotBlank() }
             .map { FileTypeCategory.valueOf(it) }.toSet(),
@@ -85,6 +92,7 @@ fun SyncJob.toEntity() = SyncJobEntity(
     driveFolderName = driveFolderName,
     localFolderUri = localFolderUri,
     localFolderName = localFolderName,
+    excludedSubfolders = excludedSubfolders.joinToString("\n") { Uri.encode(it) },
     direction = direction.name,
     fileTypes = fileTypes.joinToString(",") { it.name },
     customExtensions = customExtensions.joinToString(","),

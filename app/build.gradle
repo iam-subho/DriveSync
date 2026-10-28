@@ -32,10 +32,20 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("key.jks")
+            storePassword = "123456"
+            keyAlias = "key0"
+            keyPassword = "123456"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -94,9 +104,13 @@ dependencies {
     implementation libs.coil.compose
 
     // Google auth + Drive
+    //noinspection LoginCredentials
     implementation libs.credentials
+    //noinspection LoginCredentials
     implementation libs.credentials.play.services
+    //noinspection LoginCredentials
     implementation libs.googleid
+    //noinspection LoginCredentials
     implementation libs.play.services.auth
     implementation(libs.google.api.client.android) {
         exclude group: 'org.apache.httpcomponents'

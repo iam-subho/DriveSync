@@ -36,9 +36,10 @@ class SyncPlannerTest {
         downMb: Int? = null, downMode: LimitMode = LimitMode.SKIP_ABOVE,
         deleteAfterUpload: Boolean = false,
         md5: (LocalFile) -> String? = { null },
+        excludedSubfolders: Set<String> = emptySet(),
     ) = planner.plan(
         direction, locals, remotes, filter, upMb, upMode, downMb, downMode,
-        deleteAfterUpload, md5,
+        deleteAfterUpload, md5, excludedSubfolders,
     )
 
     // ---- missing on one side ----
@@ -98,6 +99,41 @@ class SyncPlannerTest {
         assertThat(entries).hasSize(1)
         val skip = entries[0] as PlanEntry.Skip
         assertThat(skip.reason).isEqualTo("Identical hash on Drive")
+    }
+
+    @Test
+    fun `same relative path and matching content is not uploaded`() {
+        val entries = plan(
+            SyncDirection.UPLOAD_ONLY,
+            listOf(local("photos/a.jpg", mtime = 10_000)),
+            listOf(remote("photos/a.jpg", mtime = 10_500, md5 = "abc")),
+            md5 = { "abc" },
+        )
+        assertThat(entries).hasSize(1)
+        assertThat(entries.single()).isInstanceOf(PlanEntry.Skip::class.java)
+    }
+
+    @Test
+    fun `same size but different content uploads when local is newer`() {
+        val entries = plan(
+            SyncDirection.UPLOAD_ONLY,
+            listOf(local("photos/a.jpg", mtime = 10_500)),
+            listOf(remote("photos/a.jpg", mtime = 10_000, md5 = "remote-hash", id = "remote-id")),
+            md5 = { "local-hash" },
+        )
+        assertThat(entries).hasSize(1)
+        assertThat((entries.single() as PlanEntry.Upload).overwriteRemoteId).isEqualTo("remote-id")
+    }
+
+    @Test
+    fun `excluded folder branch is skipped for local and remote files`() {
+        val entries = plan(
+            SyncDirection.TWO_WAY,
+            locals = listOf(local("keep/a.jpg"), local("skip/sub/b.jpg")),
+            remotes = listOf(remote("keep/a.jpg"), remote("skip/remote.jpg")),
+            excludedSubfolders = setOf("skip"),
+        )
+        assertThat(entries).isEmpty()
     }
 
     // ---- newest wins conflicts ----

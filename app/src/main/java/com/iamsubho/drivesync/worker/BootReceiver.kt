@@ -27,6 +27,9 @@ class BootReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                jobDao.byStatus(SyncStatus.PAUSING.name).forEach { job ->
+                    jobDao.updateStatus(job.id, SyncStatus.PAUSED.name, null)
+                }
                 jobDao.byStatus(SyncStatus.SYNCING.name).forEach { job ->
                     syncController.start(job.id)
                 }

@@ -8,6 +8,7 @@ interface SyncController {
     fun observeProgress(jobId: Long): Flow<SyncProgress?>
     fun start(jobId: Long)
     fun pause(jobId: Long)
+    fun cancel(jobId: Long)
 
     /** (Re)registers the job's automatic periodic run. */
     fun schedulePeriodic(jobId: Long, intervalHours: Int)

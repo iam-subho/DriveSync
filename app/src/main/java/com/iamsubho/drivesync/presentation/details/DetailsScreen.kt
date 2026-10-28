@@ -159,7 +159,7 @@ private fun androidx.compose.foundation.layout.RowScope.DetailsTabItem(
 @Composable
 private fun OverviewTab(state: DetailsUiState, viewModel: DetailsViewModel) {
     val job = state.job ?: return
-    val isSyncing = job.status == SyncStatus.SYNCING
+    val isSyncing = job.status == SyncStatus.SYNCING || job.status == SyncStatus.PAUSING
 
     Column(
         modifier = Modifier
@@ -198,11 +198,18 @@ private fun OverviewTab(state: DetailsUiState, viewModel: DetailsViewModel) {
                             fontSize = 12.sp, color = DsColors.TextTertiary,
                         )
                     }
+                } else if (job.status == SyncStatus.PAUSING) {
+                    Text(
+                        text = "Finishing current file…",
+                        fontSize = 12.sp,
+                        color = DsColors.TextSecondary,
+                    )
                 } else {
                     val chip = statusChipStyle(job.status)
                     val statusLine = when (job.status) {
                         SyncStatus.UP_TO_DATE -> "Everything is in sync."
                         SyncStatus.PAUSED -> "Sync is paused. ${job.pendingCount} files pending."
+                        SyncStatus.PAUSING -> "Finishing the current file before pausing."
                         SyncStatus.NEVER_SYNCED -> "This job has not run yet."
                         SyncStatus.SYNCING -> "Preparing sync…"
                         SyncStatus.ERROR -> job.errorMessage ?: "Sync failed."

@@ -39,10 +39,19 @@ class SyncControllerImpl @Inject constructor(
 
     override fun start(jobId: Long) {
         scope.launch {
-            jobDao.updateStatus(jobId, SyncStatus.SYNCING.name, null)
+            if (jobDao.updateStatusForStart(jobId, SyncStatus.SYNCING.name, null) > 0) {
+                enqueueManual(jobId, androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE)
+            }
         }
+    }
+
+    private fun enqueueManual(jobId: Long, policy: ExistingWorkPolicy) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setInputData(workDataOf(SyncWorker.KEY_JOB_ID to jobId))
+            .setInputData(
+                workDataOf(
+                    SyncWorker.KEY_JOB_ID to jobId,
+                ),
+            )
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -52,16 +61,21 @@ class SyncControllerImpl @Inject constructor(
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             SyncWorker.uniqueName(jobId),
-            ExistingWorkPolicy.REPLACE,
+            policy,
             request,
         )
     }
 
     override fun pause(jobId: Long) {
+        scope.launch {
+            jobDao.updateStatusIfSyncing(jobId, SyncStatus.PAUSING.name, null)
+        }
+    }
+
+    override fun cancel(jobId: Long) {
         WorkManager.getInstance(context).cancelUniqueWork(SyncWorker.uniqueName(jobId))
         scope.launch {
             queueDao.resetRunning(jobId)
-            jobDao.updateStatus(jobId, SyncStatus.PAUSED.name, null)
             progressBus.update(jobId, null)
         }
     }
